@@ -1,0 +1,6 @@
+#pragma once
+
+#include <util/assets.hpp>
+
+ASSET_DECL(DEFAULT_VERTEX_SHADER)
+ASSET_DECL(DEFAULT_FRAGMENT_SHADER)
