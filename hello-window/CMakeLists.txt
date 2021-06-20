@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 cmake_policy(VERSION 3.16)
 
-set(PROJECT_NAME "hello-window")
+set(PROJECT_NAME "hello-window.out")
 
 project(${PROJECT_NAME} C CXX)
 
