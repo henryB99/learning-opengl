@@ -158,9 +158,9 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Draw the triangle.
-        glUseProgram(shader_program);
-        glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glUseProgram(shader_program);       // As the program gets more sophisticated and more shader programs and buffer objects are used,
+        glBindVertexArray(vao);             // glUseProgram() and glDrawArrays() allow us to swap these around as needed. In this example,
+        glDrawArrays(GL_TRIANGLES, 0, 3);   // there is really no need to call these functions in each iteration of the rendering loop.
 
         glfwSwapBuffers(window);
         glfwPollEvents();
