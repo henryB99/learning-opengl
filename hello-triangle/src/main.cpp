@@ -1,10 +1,9 @@
 #include <iostream>
-#include <fstream>
 #include <string>
+#include <cstdio>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <util/types.hpp>
-#include <util/shaders.hpp>
 
 // Simple exception handling for the program.
 enum StatusCode {
@@ -13,6 +12,32 @@ enum StatusCode {
     GLEW_ERROR,
     SHADER_ERROR,
 };
+
+struct Vertex {
+    float x, y, z;
+    u8 r, g, b, a;
+};
+
+char* load_shader(const char* file_name)
+{
+    FILE* shader_file = fopen(file_name, "r");
+
+    if (!shader_file)
+        return nullptr;
+
+    fseek(shader_file, 0L, SEEK_END);
+    size_t file_size = ftell(shader_file);
+    rewind(shader_file);
+
+    if (!file_size)
+        return nullptr;
+
+    char* shader_source = (char*)malloc(file_size);
+    fread(shader_source, file_size, 1, shader_file);
+    fclose(shader_file);
+
+    return shader_source;
+}
 
 void handle_resize(GLFWwindow* window, i32 width, i32 height)
 {
@@ -74,6 +99,14 @@ int main()
 
     // Load and compile vertex shader.
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+
+    char* vertex_shader_source = load_shader("src/shaders/vertex_shader.glsl");
+    if (!vertex_shader_source)
+    {
+        std::cout << "Could not load vertex shader." << std::endl;
+        return StatusCode::SHADER_ERROR;
+    }
+
     glShaderSource(vertex_shader, 1, &vertex_shader_source, nullptr);
     glCompileShader(vertex_shader);
 
@@ -88,6 +121,14 @@ int main()
 
     // Load and compile fragment shader.
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    char* fragment_shader_source = load_shader("src/shaders/fragment_shader.glsl");
+    if (!fragment_shader_source)
+    {
+        std::cout << "Could not load fragment shader." << std::endl;
+        return StatusCode::SHADER_ERROR;
+    }
+
     glShaderSource(fragment_shader, 1, &fragment_shader_source, nullptr);
     glCompileShader(fragment_shader);
 
@@ -118,7 +159,9 @@ int main()
     // These aren't needed anymore since the shader program was created successfully
     // and can be unloaded.
     glDeleteShader(vertex_shader);
+    free(vertex_shader_source);
     glDeleteShader(fragment_shader);
+    free(fragment_shader_source);
 
     /* Create and populate vertex buffer. */
 
