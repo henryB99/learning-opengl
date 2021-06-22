@@ -5,7 +5,14 @@
 #include <GLFW/glfw3.h>
 #include <util/types.hpp>
 
-#define EXCERCISE 1
+/* Exercises */
+#define BEFORE_EXERCISES 0 // Code as it was before doing the exercises.
+#define FIRST_EXERCISE   1 // Vertices for a second triangle added.
+#define SECOND_EXERCISE  2 // Additional VAO and VBO added for second triangle.
+#define THIRD_EXERCISE   3 // Additional shader addded for second triangle.
+
+// Switch between exercises here.
+#define EXCERCISE THIRD_EXERCISE
 
 // Simple exception handling for the program.
 enum StatusCode {
@@ -116,7 +123,7 @@ int main()
         glfwTerminate();
         return StatusCode::GLEW_ERROR;
     }
-    
+
     glViewport(0, 0, 800, 600);
     glfwSetFramebufferSizeCallback(window, handle_resize);
 
@@ -190,6 +197,43 @@ int main()
         return StatusCode::SHADER_ERROR;
     }
 
+#if EXCERCISE == 3
+
+    fragment_shader_source = load_shader_source("src/shaders/fragment_shader_yellow.glsl");
+    if (!fragment_shader_source)
+    {
+        std::cout << "Could not load fragment shader." << std::endl;
+        return StatusCode::SHADER_ERROR;
+    }
+
+    glShaderSource(fragment_shader, 1, &fragment_shader_source, nullptr);
+    glCompileShader(fragment_shader);
+
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &compilation_successful);
+    if (!compilation_successful)
+    {
+        glGetShaderInfoLog(fragment_shader, 512, nullptr, log);
+        std::cout << "Could not compile fragment shader." << std::endl;
+        std::cout << log << std::endl;
+        return StatusCode::SHADER_ERROR;
+    }
+
+    u32 shader_yellow = glCreateProgram();
+    glAttachShader(shader_yellow, vertex_shader);
+    glAttachShader(shader_yellow, fragment_shader);
+
+    glLinkProgram(shader_yellow);
+    glGetShaderiv(shader_program, GL_LINK_STATUS, &compilation_successful);
+    if (!compilation_successful)
+    {
+        glGetProgramInfoLog(shader_program, 512, nullptr, log);
+        std::cout << "Could not link shader program." << std::endl;
+        std::cout << log << std::endl;
+        return StatusCode::SHADER_ERROR;
+    }
+
+#endif
+
     // These aren't needed anymore since the shader program was created successfully
     // and can be unloaded.
     glDeleteShader(vertex_shader);
@@ -197,7 +241,7 @@ int main()
     glDeleteShader(fragment_shader);
     free(fragment_shader_source);
 
-    /* Create and populate vertex buffer. */
+    /* Create and populate vertex buffer. */    
 
     Vec3D vertices[] = {
         // hexagon
@@ -213,9 +257,9 @@ int main()
         {  0.5f, -0.5f, 0.0f }, // right
         {  0.0f,  0.5f, 0.0f }, // top
         // second triangle
-        { 0.0f },
-        { 0.0f },
-        { 0.0f },
+        { 0.3f, 0.3f, 0.0f }, // left
+        { 0.9f, 0.3f, 0.0f }, // right
+        { 0.6f, 0.8f, 0.0f }, // top
     };
 
     u32 hexagon[] = {
@@ -226,6 +270,8 @@ int main()
         0, 5, 6,
         0, 6, 1,
     };
+
+#if EXCERCISE == 0 || EXCERCISE == 1 || EXCERCISE == 3
 
     GLuint vao, vbo, ebo;
 
@@ -252,6 +298,40 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+#elif EXCERCISE == 2
+
+    GLuint vbo_array[2];
+    GLuint* vbo_triangle1 = &vbo_array[0];
+    GLuint* vbo_triangle2 = &vbo_array[1];
+
+    GLuint vao_array[2];
+    GLuint* vao_triangle1 = &vao_array[0];
+    GLuint* vao_triangle2 = &vao_array[1];
+
+    glGenVertexArrays(2, vao_array);
+    glGenBuffers(2, vbo_array);
+
+    glBindVertexArray(*vao_triangle1);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo_triangle1);
+
+    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(Vec3D), &vertices[7], GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3D), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(*vao_triangle2);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo_triangle2);
+
+    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(Vec3D), &vertices[10], GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3D), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+#endif
+
     /* Main loop */
 
     while (!glfwWindowShouldClose(window))
@@ -264,6 +344,9 @@ int main()
         // glUseProgram() and glDrawArrays() allow us to swap these around as needed. In this example,
         // there is really no need to call these functions in each iteration of the rendering loop.
         glUseProgram(shader_program);
+
+#if EXCERCISE == 0
+
         glBindVertexArray(vao);
 
         switch(g_drawn_shape)
@@ -277,6 +360,60 @@ int main()
                 glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
                 break;
         }
+
+#elif EXCERCISE == 1
+
+        glBindVertexArray(vao);
+
+        switch(g_drawn_shape)
+        {
+            case Shape::TRIANGLE:
+                // Draw the triangle.
+                glDrawArrays(GL_TRIANGLES, 7, 3);
+                glDrawArrays(GL_TRIANGLES, 10, 3);
+                break;
+            case Shape::HEXAGON:
+                // Draw the hexagon.
+                glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
+                break;
+        }
+
+#elif EXCERCISE == 2
+
+        switch(g_drawn_shape)
+        {
+            case Shape::TRIANGLE:
+                // Draw the triangle.
+                glBindVertexArray(*vao_triangle1);
+                glDrawArrays(GL_TRIANGLES, 0, 3);
+                glBindVertexArray(*vao_triangle2);
+                glDrawArrays(GL_TRIANGLES, 0, 3);
+                break;
+            case Shape::HEXAGON:
+                // Draw the hexagon.
+                glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
+                break;
+        }
+
+#elif EXCERCISE == 3
+
+        glBindVertexArray(vao);
+
+        switch(g_drawn_shape)
+        {
+            case Shape::TRIANGLE:
+                // Draw the triangle.
+                glDrawArrays(GL_TRIANGLES, 7, 3);
+                glUseProgram(shader_yellow);                
+                glDrawArrays(GL_TRIANGLES, 10, 3);
+                break;
+            case Shape::HEXAGON:
+                // Draw the hexagon.
+                glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
+                break;
+        }
+
+#endif
 
         glfwSwapBuffers(window);
         glfwPollEvents();
