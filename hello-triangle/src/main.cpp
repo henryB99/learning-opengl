@@ -5,6 +5,8 @@
 #include <GLFW/glfw3.h>
 #include <util/types.hpp>
 
+#define EXCERCISE 1
+
 // Simple exception handling for the program.
 enum StatusCode {
     OK = 0,
@@ -13,20 +15,35 @@ enum StatusCode {
     SHADER_ERROR,
 };
 
-struct Vertex {
-    float x, y, z;
-    u8 r, g, b, a;
+enum Shape {
+    TRIANGLE = 0,
+    HEXAGON,
+    DEFAULT = TRIANGLE,
 };
 
-char* load_shader(const char* file_name)
+struct Vec3D {
+    float x, y, z;
+};
+
+// There probably is a better way to hold the program's state than through
+// global variables. But for now, this suffices.
+
+// Global state variable used to determine which shape should be drawn.
+Shape g_drawn_shape = Shape::DEFAULT;
+
+// Global state variables used for handling wireframe mode.
+bool g_wire_mode = false, g_poll_w_key = true;
+
+char* load_shader_source(const char* file_name)
 {
     FILE* shader_file = fopen(file_name, "r");
 
     if (!shader_file)
         return nullptr;
 
+    // Get file size in bytes.
     fseek(shader_file, 0L, SEEK_END);
-    size_t file_size = ftell(shader_file);
+    u64 file_size = ftell(shader_file);
     rewind(shader_file);
 
     if (!file_size)
@@ -49,6 +66,23 @@ void handle_inputs(GLFWwindow* window)
     // Close window when ESC key was pressed.
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+        g_drawn_shape = Shape::TRIANGLE;
+
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+        g_drawn_shape = Shape::HEXAGON;
+
+    // Toggle logic for enabling / disabling wireframe mode.
+    u16 w_key_status = glfwGetKey(window, GLFW_KEY_W);
+    if (g_poll_w_key && w_key_status == GLFW_PRESS)
+    {
+        g_poll_w_key = false;
+        g_wire_mode = !g_wire_mode;
+        glPolygonMode(GL_FRONT_AND_BACK, g_wire_mode ? GL_LINE : GL_FILL);
+    }
+    else if (w_key_status == GLFW_RELEASE)
+        g_poll_w_key = true;
 }
 
 int main()
@@ -82,11 +116,11 @@ int main()
         glfwTerminate();
         return StatusCode::GLEW_ERROR;
     }
-
+    
     glViewport(0, 0, 800, 600);
     glfwSetFramebufferSizeCallback(window, handle_resize);
 
-    glClearColor(0.0f, 0.9f, 0.5f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     /* Load shaders. */
 
@@ -100,7 +134,7 @@ int main()
     // Load and compile vertex shader.
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 
-    char* vertex_shader_source = load_shader("src/shaders/vertex_shader.glsl");
+    char* vertex_shader_source = load_shader_source("src/shaders/vertex_shader.glsl");
     if (!vertex_shader_source)
     {
         std::cout << "Could not load vertex shader." << std::endl;
@@ -122,7 +156,7 @@ int main()
     // Load and compile fragment shader.
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
-    char* fragment_shader_source = load_shader("src/shaders/fragment_shader.glsl");
+    char* fragment_shader_source = load_shader_source("src/shaders/fragment_shader.glsl");
     if (!fragment_shader_source)
     {
         std::cout << "Could not load fragment shader." << std::endl;
@@ -165,32 +199,58 @@ int main()
 
     /* Create and populate vertex buffer. */
 
-    float triangle[] = {
-        -0.5f, -0.5f, 0.0f, 
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f 
+    Vec3D vertices[] = {
+        // hexagon
+        {  0.0f,   0.0f,  0.0f }, // center
+        { -0.66f,  0.0f,  0.0f }, // left
+        { -0.33f,  0.75f, 0.0f }, // top left
+        {  0.33f,  0.75f, 0.0f }, // top right
+        {  0.66f,  0.0f,  0.0f }, // right
+        {  0.33f, -0.75f, 0.0f }, // bottom right
+        { -0.33f, -0.75f, 0.0f }, // bottom left
+        // first triangle
+        { -0.5f, -0.5f, 0.0f }, // left
+        {  0.5f, -0.5f, 0.0f }, // right
+        {  0.0f,  0.5f, 0.0f }, // top
+        // second triangle
+        { 0.0f },
+        { 0.0f },
+        { 0.0f },
     };
 
-    GLuint vao, vbo;
+    u32 hexagon[] = {
+        0, 1, 2,
+        0, 2, 3,
+        0, 3, 4,
+        0, 4, 5,
+        0, 5, 6,
+        0, 6, 1,
+    };
+
+    GLuint vao, vbo, ebo;
 
     // 1. Create the objects.
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
 
     // 2. Bind the objects.
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 
     // 3. Populate buffer object.
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(hexagon), hexagon, GL_STATIC_DRAW);
 
     // 4. Specify the memory layout.
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3D), (void*)0);
     glEnableVertexAttribArray(0);
 
     // 5. Unbind the objects.
-    glBindBuffer(GL_ARRAY_BUFFER, 0); 
-    glBindVertexArray(0); 
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     /* Main loop */
 
@@ -200,10 +260,23 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Draw the triangle.
-        glUseProgram(shader_program);       // As the program gets more sophisticated and more shader programs and buffer objects are used,
-        glBindVertexArray(vao);             // glUseProgram() and glDrawArrays() allow us to swap these around as needed. In this example,
-        glDrawArrays(GL_TRIANGLES, 0, 3);   // there is really no need to call these functions in each iteration of the rendering loop.
+        // As the program gets more sophisticated and more shader programs and buffer objects are used,
+        // glUseProgram() and glDrawArrays() allow us to swap these around as needed. In this example,
+        // there is really no need to call these functions in each iteration of the rendering loop.
+        glUseProgram(shader_program);
+        glBindVertexArray(vao);
+
+        switch(g_drawn_shape)
+        {
+            case Shape::TRIANGLE:
+                // Draw the triangle.
+                glDrawArrays(GL_TRIANGLES, 7, 3);
+                break;
+            case Shape::HEXAGON:
+                // Draw the hexagon.
+                glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
+                break;
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
