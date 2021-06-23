@@ -31,8 +31,20 @@
 *.out
 *.app
 
+#Swap files
+*.swp
+
 #CMake
 CMakeFiles
 cmake_install.cmake
 CMakeCache.txt
+.CMakeLists.*
 Makefile
+
+#LSP
+compile_commands.json
+
+#IDE project files
+.idea
+.vscode
+.sublime-text
