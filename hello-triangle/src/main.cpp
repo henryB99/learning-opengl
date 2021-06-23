@@ -5,14 +5,16 @@
 #include <GLFW/glfw3.h>
 #include <util/types.hpp>
 
+static const char* WINDOW_TITLE = "Learn OpenGL";
+
 /* Exercises */
 #define BEFORE_EXERCISES 0 // Code as it was before doing the exercises.
 #define FIRST_EXERCISE   1 // Vertices for a second triangle added.
-#define SECOND_EXERCISE  2 // Additional VAO and VBO added for second triangle.
-#define THIRD_EXERCISE   3 // Additional shader addded for second triangle.
+#define SECOND_EXERCISE  2 // Additional VAO and VBO added for the second triangle.
+#define THIRD_EXERCISE   3 // Additional shader added for the second triangle.
 
 // Switch between exercises here.
-#define EXCERCISE THIRD_EXERCISE
+#define EXERCISE SECOND_EXERCISE
 
 // Simple exception handling for the program.
 enum StatusCode {
@@ -28,8 +30,18 @@ enum Shape {
     DEFAULT = TRIANGLE,
 };
 
+// Type safety for OpenGL shader enums.
+enum ShaderType {
+    VERTEX_SHADER = GL_VERTEX_SHADER,
+    FRAGMENT_SHADER = GL_FRAGMENT_SHADER,
+};
+
 struct Vec3D {
     float x, y, z;
+};
+
+struct Color {
+    float r, g, b, a;
 };
 
 // There probably is a better way to hold the program's state than through
@@ -61,6 +73,29 @@ char* load_shader_source(const char* file_name)
     fclose(shader_file);
 
     return shader_source;
+}
+
+// FIXME: Using this function leads to an error while linking the shader program.
+bool load_shader(GLuint* shader, const char* file_name, ShaderType shader_type)
+{
+    *shader = glCreateShader(shader_type);
+    
+    char* shader_source = load_shader_source(file_name);
+
+    if (!shader_source)
+    {
+        free(shader_source);
+        return false;
+    }
+
+    i32 compilation_successful;
+
+    glShaderSource(*shader, 1, &shader_source, nullptr);
+    glCompileShader(*shader);
+    glGetShaderiv(*shader, GL_COMPILE_STATUS, &compilation_successful);
+    free(shader_source);
+    
+    return compilation_successful;
 }
 
 void handle_resize(GLFWwindow* window, i32 width, i32 height)
@@ -107,7 +142,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(800, 600, "Learn OpenGL", nullptr, nullptr);
+    window = glfwCreateWindow(800, 600, WINDOW_TITLE, nullptr, nullptr);
     if (window == nullptr)
     {
         std::cout << "Could not create window." << std::endl;
@@ -131,14 +166,22 @@ int main()
 
     /* Load shaders. */
 
-    u32 vertex_shader;
-    u32 fragment_shader;
-    u32 shader_program;
+    GLuint vertex_shader;
+    GLuint fragment_shader;
+    GLuint shader_program;
 
     i32 compilation_successful;
     char log[512];
 
     // Load and compile vertex shader.
+    // if (!load_shader(&vertex_shader, "src/shaders/vertex_shader.glsl", ShaderType::VERTEX_SHADER))
+    // {
+    //     glGetShaderInfoLog(vertex_shader, 512, nullptr, log);
+    //     std::cout << "Could not load vertex shader." << std::endl;
+    //     std::cout << log << std::endl;
+    //     return StatusCode::SHADER_ERROR;
+    // }
+
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 
     char* vertex_shader_source = load_shader_source("src/shaders/vertex_shader.glsl");
@@ -161,6 +204,14 @@ int main()
     }
 
     // Load and compile fragment shader.
+    // if (!load_shader(&fragment_shader, "src/shaders/fragment_shader.glsl", ShaderType::FRAGMENT_SHADER))
+    // {
+    //     glGetShaderInfoLog(fragment_shader, 512, nullptr, log);
+    //     std::cout << "Could not load fragment shader." << std::endl;
+    //     std::cout << log << std::endl;
+    //     return StatusCode::SHADER_ERROR;
+    // }
+
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
     char* fragment_shader_source = load_shader_source("src/shaders/fragment_shader.glsl");
@@ -197,7 +248,7 @@ int main()
         return StatusCode::SHADER_ERROR;
     }
 
-#if EXCERCISE == 3
+#if EXERCISE == 3
 
     fragment_shader_source = load_shader_source("src/shaders/fragment_shader_yellow.glsl");
     if (!fragment_shader_source)
@@ -236,10 +287,10 @@ int main()
 
     // These aren't needed anymore since the shader program was created successfully
     // and can be unloaded.
-    glDeleteShader(vertex_shader);
     free(vertex_shader_source);
-    glDeleteShader(fragment_shader);
+    glDeleteShader(vertex_shader);
     free(fragment_shader_source);
+    glDeleteShader(fragment_shader);
 
     /* Create and populate vertex buffer. */    
 
@@ -253,16 +304,16 @@ int main()
         {  0.33f, -0.75f, 0.0f }, // bottom right
         { -0.33f, -0.75f, 0.0f }, // bottom left
         // first triangle
-        { -0.5f, -0.5f, 0.0f }, // left
-        {  0.5f, -0.5f, 0.0f }, // right
-        {  0.0f,  0.5f, 0.0f }, // top
+        { -0.5f,  -0.5f,  0.0f }, // left
+        {  0.5f,  -0.5f,  0.0f }, // right
+        {  0.0f,   0.5f,  0.0f }, // top
         // second triangle
-        { 0.3f, 0.3f, 0.0f }, // left
-        { 0.9f, 0.3f, 0.0f }, // right
-        { 0.6f, 0.8f, 0.0f }, // top
+        {  0.3f,   0.3f,  0.0f }, // left
+        {  0.9f,   0.3f,  0.0f }, // right
+        {  0.6f,   0.8f,  0.0f }, // top
     };
 
-    u32 hexagon[] = {
+    GLuint hexagon[] = {
         0, 1, 2,
         0, 2, 3,
         0, 3, 4,
@@ -271,7 +322,7 @@ int main()
         0, 6, 1,
     };
 
-#if EXCERCISE == 0 || EXCERCISE == 1 || EXCERCISE == 3
+#if EXERCISE == 0 || EXERCISE == 1 || EXERCISE == 3
 
     GLuint vao, vbo, ebo;
 
@@ -298,7 +349,7 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-#elif EXCERCISE == 2
+#elif EXERCISE == 2
 
     GLuint vbo_array[2];
     GLuint* vbo_triangle1 = &vbo_array[0];
@@ -345,7 +396,7 @@ int main()
         // there is really no need to call these functions in each iteration of the rendering loop.
         glUseProgram(shader_program);
 
-#if EXCERCISE == 0
+#if EXERCISE == 0
 
         glBindVertexArray(vao);
 
@@ -361,14 +412,14 @@ int main()
                 break;
         }
 
-#elif EXCERCISE == 1
+#elif EXERCISE == 1
 
         glBindVertexArray(vao);
 
         switch(g_drawn_shape)
         {
             case Shape::TRIANGLE:
-                // Draw the triangle.
+                // Draw the triangles.
                 glDrawArrays(GL_TRIANGLES, 7, 3);
                 glDrawArrays(GL_TRIANGLES, 10, 3);
                 break;
@@ -378,31 +429,22 @@ int main()
                 break;
         }
 
-#elif EXCERCISE == 2
+#elif EXERCISE == 2
 
-        switch(g_drawn_shape)
-        {
-            case Shape::TRIANGLE:
-                // Draw the triangle.
-                glBindVertexArray(*vao_triangle1);
-                glDrawArrays(GL_TRIANGLES, 0, 3);
-                glBindVertexArray(*vao_triangle2);
-                glDrawArrays(GL_TRIANGLES, 0, 3);
-                break;
-            case Shape::HEXAGON:
-                // Draw the hexagon.
-                glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, 0);
-                break;
-        }
+            // Draw the triangles.
+            glBindVertexArray(*vao_triangle1);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(*vao_triangle2);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
 
-#elif EXCERCISE == 3
+#elif EXERCISE == 3
 
         glBindVertexArray(vao);
 
         switch(g_drawn_shape)
         {
             case Shape::TRIANGLE:
-                // Draw the triangle.
+                // Draw the triangles.
                 glDrawArrays(GL_TRIANGLES, 7, 3);
                 glUseProgram(shader_yellow);                
                 glDrawArrays(GL_TRIANGLES, 10, 3);
